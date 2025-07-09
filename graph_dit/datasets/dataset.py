@@ -23,6 +23,8 @@ from diffusion.distributions import DistributionNodes
 
 bonds = {BT.SINGLE: 1, BT.DOUBLE: 2, BT.TRIPLE: 3, BT.AROMATIC: 4}
 
+n_atoms_per_mol_max = 50
+
 class DataModule(AbstractDataModule):
     def __init__(self, cfg):
         self.datadir = cfg.dataset.datadir
@@ -38,8 +40,9 @@ class DataModule(AbstractDataModule):
         batch_size = self.cfg.train.batch_size
         num_workers = self.cfg.train.num_workers
         pin_memory = self.cfg.dataset.pin_memory
+        print(self.task, self.root_path)
 
-        dataset = Dataset(source=self.task, root=root_path, target_prop=target, transform=None)
+        dataset = Dataset(source=self.task, root=root_path, target_prop=target, transform=None, force_process=True)
 
         if len(self.task.split('-')) == 2:
             train_index, val_index, test_index, unlabeled_index = self.fixed_split(dataset)
@@ -117,10 +120,15 @@ class DataModule(AbstractDataModule):
 
 class Dataset(InMemoryDataset):
     def __init__(self, source, root, target_prop=None,
-                 transform=None, pre_transform=None, pre_filter=None):
+                 transform=None, pre_transform=None, pre_filter=None, force_process=False):
         self.target_prop = target_prop
         self.source = source
+        self.force_process = force_process
+
         super().__init__(root, transform, pre_transform, pre_filter)
+        if not os.path.exists(self.processed_paths[0]) or self.force_process:
+            print(f"[INFO] Reprocessing dataset {self.source} (force={self.force_process})")
+            self.process()
         self.data, self.slices = torch.load(self.processed_paths[0])
 
     @property
@@ -131,49 +139,44 @@ class Dataset(InMemoryDataset):
     def processed_file_names(self):
         return [f'{self.source}.pt']
 
+    def _mol_to_graph(self, index, mol, target, valid_atoms=None):
+        type_idx = []
+        heavy_atom_indices, active_atoms = [], []
+        for atom in mol.GetAtoms():
+            if atom.GetAtomicNum() != 1:
+                type_idx.append(119-2) if atom.GetSymbol() == '*' else type_idx.append(atom.GetAtomicNum()-2)
+                heavy_atom_indices.append(atom.GetIdx())
+                active_atoms.append(atom.GetSymbol())
+                if valid_atoms is not None:
+                    if not atom.GetSymbol() in valid_atoms:
+                        return None, None
+        x = torch.LongTensor(type_idx)
+
+        edges_list = []
+        edge_type = []
+        for bond in mol.GetBonds():
+            start, end = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if start in heavy_atom_indices and end in heavy_atom_indices:
+                start_new, end_new = heavy_atom_indices.index(start), heavy_atom_indices.index(end)
+                edges_list.append((start_new, end_new))
+                edge_type.append(bonds[bond.GetBondType()])
+                edges_list.append((end_new, start_new))
+                edge_type.append(bonds[bond.GetBondType()])
+        edge_index = torch.tensor(edges_list, dtype=torch.long).t()
+        edge_type = torch.tensor(edge_type, dtype=torch.long)
+        edge_attr = edge_type
+
+        y = torch.tensor(target, dtype=torch.float).view(1, -1)
+
+        data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y, idx=index)
+        if self.pre_transform is not None:
+            data = self.pre_transform(data)
+        return data, active_atoms
+    
     def process(self):
         RDLogger.DisableLog('rdApp.*')
         data_path = osp.join(self.raw_dir, self.raw_file_names[0])
         data_df = pd.read_csv(data_path)
-       
-        def mol_to_graph(mol, sa, sc, target, target2=None, target3=None, valid_atoms=None):
-            type_idx = []
-            heavy_atom_indices, active_atoms = [], []
-            for atom in mol.GetAtoms():
-                if atom.GetAtomicNum() != 1:
-                    type_idx.append(119-2) if atom.GetSymbol() == '*' else type_idx.append(atom.GetAtomicNum()-2)
-                    heavy_atom_indices.append(atom.GetIdx())
-                    active_atoms.append(atom.GetSymbol())
-                    if valid_atoms is not None:
-                        if not atom.GetSymbol() in valid_atoms:
-                            return None, None
-            x = torch.LongTensor(type_idx)
-
-            edges_list = []
-            edge_type = []
-            for bond in mol.GetBonds():
-                start, end = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-                if start in heavy_atom_indices and end in heavy_atom_indices:
-                    start_new, end_new = heavy_atom_indices.index(start), heavy_atom_indices.index(end)
-                    edges_list.append((start_new, end_new))
-                    edge_type.append(bonds[bond.GetBondType()])
-                    edges_list.append((end_new, start_new))
-                    edge_type.append(bonds[bond.GetBondType()])
-            edge_index = torch.tensor(edges_list, dtype=torch.long).t()
-            edge_type = torch.tensor(edge_type, dtype=torch.long)
-            edge_attr = edge_type
-
-            if target3 is not None:
-                y = torch.tensor([sa, sc, target, target2, target3], dtype=torch.float).view(1,-1)
-            elif target2 is not None:
-                y = torch.tensor([sa, sc, target, target2], dtype=torch.float).view(1,-1)
-            else:
-                y = torch.tensor([sa, sc, target], dtype=torch.float).view(1,-1)
-
-            data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, y=y, idx=i)
-            if self.pre_transform is not None:
-                data = self.pre_transform(data)
-            return data, active_atoms
         
         # Loop through every row in the DataFrame and apply the function
         data_list = []
@@ -182,17 +185,13 @@ class Dataset(InMemoryDataset):
             # --- data processing start ---
             active_atoms = set()
             for i, (sms, df_row) in enumerate(data_df.iterrows()):
-                if i == sms:
-                    sms = df_row['smiles']
+                sms = df_row['smiles']
                 mol = Chem.MolFromSmiles(sms, sanitize=False)
-                if len(self.target_prop.split('-')) == 2:
-                    target1, target2 = self.target_prop.split('-')
-                    data, cur_active_atoms = mol_to_graph(mol, df_row['SA'], df_row['SC'], df_row[target1], target2=df_row[target2])
-                elif len(self.target_prop.split('-')) == 3:
-                    target1, target2, target3 = self.target_prop.split('-')
-                    data, cur_active_atoms = mol_to_graph(mol, df_row['SA'], df_row['SC'], df_row[target1], target2=df_row[target2], target3=df_row[target3])
-                else:
-                    data, cur_active_atoms = mol_to_graph(mol, df_row['SA'], df_row['SC'], df_row[self.target_prop])
+
+                target_keys = self.target_prop.split('-')
+                target_values = [df_row[key] for key in target_keys]
+                data, cur_active_atoms = self._mol_to_graph(i, mol, target=target_values)
+
                 active_atoms.update(cur_active_atoms)
                 data_list.append(data)
                 pbar.update(1)
@@ -209,6 +208,9 @@ class DataInfos(AbstractDatasetInfos):
             'O2': 'regression',
             'N2': 'regression',
             'CO2': 'regression',
+            'glass': 'regression',
+            'TC': 'regression',
+            'heat_related_output': 'regression'
         }
         task_name = cfg.dataset.task_name
         self.task = task_name
@@ -334,7 +336,7 @@ def compute_meta(root, source_name, train_index, test_index):
         assert (cur_tot_bond > tansition_E_temp.sum(axis=-1)).sum() >= 0, f'i:{i}, sms:{sms}'
     
     n_atoms_per_mol = np.array(n_atoms_per_mol) / np.sum(n_atoms_per_mol)
-    n_atoms_per_mol = n_atoms_per_mol.tolist()[:51]
+    n_atoms_per_mol = n_atoms_per_mol.tolist()[:n_atoms_per_mol_max]
 
     atom_count_list = np.array(atom_count_list) / np.sum(atom_count_list)
     print('processed meta info: ------', filename, '------')

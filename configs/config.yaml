@@ -31,7 +31,7 @@ model:
     ensure_connected: True
 train:
     n_epochs: 10000
-    batch_size: 1200
+    batch_size: 200
     lr: 0.0002
     clip_grad: null
     num_workers: 0

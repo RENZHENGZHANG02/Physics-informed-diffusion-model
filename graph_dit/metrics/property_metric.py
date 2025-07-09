@@ -23,6 +23,9 @@ task_to_colname = {
     'O2': 'O2',
     'N2': 'N2',
     'CO2': 'CO2',
+    'glass': 'Tg',
+    'TC': 'TC',
+    'heat_related_output':['mu', 'alpha', 'zpve', 'Cv']
 }
 
 tasktype_name = {
@@ -32,6 +35,9 @@ tasktype_name = {
     'O2': 'regression',
     'N2': 'regression',
     'CO2': 'regression',
+    'glass': 'regression',
+    'TC': 'regression',
+    'heat_related_output':'regression'
 }
 
 class TaskModel():
@@ -61,15 +67,16 @@ class TaskModel():
         data_path = os.path.join(os.path.dirname(self.model_path), '..', f'raw/{self.task_name}.csv.gz')
         df = pd.read_csv(data_path)
         col_name = task_to_colname[self.task_name]
+        df = df[df[col_name].notna().all(axis=1)]
         y = df[col_name].to_numpy()
         x_smiles = df['smiles'].to_numpy()
-        mask = ~np.isnan(y)
-        y = y[mask]
+        #mask = ~np.isnan(y)
+        #y = y[mask]
 
         if 'classification' in self.task_type:
             y = y.astype(int)
 
-        x_smiles = x_smiles[mask]
+        #x_smiles = x_smiles[mask]
         x_fps = []
         mask = []
         for i,smiles in enumerate(x_smiles):
