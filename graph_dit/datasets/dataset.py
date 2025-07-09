@@ -1,5 +1,6 @@
 import sys
 sys.path.append('../') 
+import yaml
 
 import os
 import os.path as osp
@@ -200,35 +201,25 @@ class Dataset(InMemoryDataset):
 
 
 class DataInfos(AbstractDatasetInfos):
-    def __init__(self, datamodule, cfg):
-        tasktype_dict = {
-            'hiv_b': 'classification',
-            'bace_b': 'classification',
-            'bbbp_b': 'classification',
-            'O2': 'regression',
-            'N2': 'regression',
-            'CO2': 'regression',
-            'glass': 'regression',
-            'TC': 'regression',
-            'heat_related_output': 'regression'
-        }
+    def __init__(self, datamodule, cfg):      
+        base_path = pathlib.Path(os.path.realpath(__file__))
+        registry = self._load_registry(os.path.join(base_path.parents[2], "configs/task_registry.yaml"))
         task_name = cfg.dataset.task_name
         self.task = task_name
-        self.task_type = tasktype_dict.get(task_name, "regression")
+        self.task_type = registry[task_name]["type"]
         self.ensure_connected = cfg.model.ensure_connected
 
         datadir = cfg.dataset.datadir
 
-        base_path = pathlib.Path(os.path.realpath(__file__)).parents[2]
-        meta_filename = os.path.join(base_path, datadir, 'raw', f'{task_name}.meta.json')
-        data_root = os.path.join(base_path, datadir, 'raw')
+        meta_filename = os.path.join(base_path.parents[2], datadir, 'raw', f'{task_name}.meta.json')
+        data_root = os.path.join(base_path.parents[2], datadir, 'raw')
         if os.path.exists(meta_filename):
             with open(meta_filename, 'r') as f:
                 meta_dict = json.load(f)
         else:
             meta_dict = compute_meta(data_root, task_name, datamodule.train_index, datamodule.test_index)
 
-        self.base_path = base_path
+        self.base_path = base_path.parents[2]
         self.active_atoms = meta_dict['active_atoms']
         self.max_n_nodes = meta_dict['max_node']
         self.original_max_n_nodes = meta_dict['max_node']
@@ -252,6 +243,10 @@ class DataInfos(AbstractDatasetInfos):
         self.train_ymin = []
         self.train_ymax = []
 
+    def _load_registry(self, path):
+        with open(path, "r") as f:
+            registry = yaml.safe_load(f)
+        return registry
 
 def compute_meta(root, source_name, train_index, test_index):
     pt = Chem.GetPeriodicTable()

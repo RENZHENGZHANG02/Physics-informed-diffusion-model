@@ -18,6 +18,13 @@ export CUDA_VISIBLE_DEVICES=3
 echo "Python path: $(which python)" | tee -a $LOGFILE
 echo "Conda env: $(conda info --envs | grep \* | awk '{print $1}')" | tee -a $LOGFILE
 
+# Generate evaluated tasks and related properties
+echo "Generate .yaml file for inputs..." | tee -a $LOGFILE
+# Notice properties used in evaluation could be different from properties used in guidance
+python generate_registry.py \
+  --task_dict '{"heat_related_output":["mu","alpha","zpve","Cv"]}' \
+  --task_types '{"heat_related_output":"regression"}' | tee -a $LOGFILE
+
 # Run the script
 echo "Starting Python script..." | tee -a $LOGFILE
 python main.py --config-name=config.yaml \

@@ -44,3 +44,7 @@ dataset:
     task_name: null
     guidance_target: null
     pin_memory: False
+    metric_model:
+        use_metric: True
+        model_dir: 'data/evaluator/'
+        use_registry: 'task_registry.yaml' 

@@ -1,0 +1,7 @@
+heat_related_output:
+  type: regression
+  cols:
+  - mu
+  - alpha
+  - zpve
+  - Cv
