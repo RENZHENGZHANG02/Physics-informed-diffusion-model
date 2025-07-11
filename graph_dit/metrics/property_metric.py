@@ -1,8 +1,6 @@
 import math, os
 import pickle
 import os.path as op
-from generate_registry import load_registry
-import pathlib
 
 import numpy as np
 import pandas as pd
@@ -20,57 +18,36 @@ rdBase.DisableLog('rdApp.error')
 
 class TaskModel():
     """Scores based on an ECFP classifier."""
-    def __init__(self, model_path, task_name):
-        base_path = pathlib.Path(os.path.realpath(__file__))
-        self.registry = load_registry(os.path.join(base_path.parents[2], "configs/task_registry.yaml"))
-        
-        task_type = self.registry[task_name]["types"]
+    def __init__(self, model_path, task_name, task_type):
         self.task_name = task_name
         self.task_type = task_type
         self.model_path = model_path
-        self.metric_func = roc_auc_score if 'classification' in self.task_type else mean_absolute_error
-        clf_model_path = model_path.replace('.pkl', '_clf.pkl')
-        reg_model_path = model_path.replace('.pkl', '_reg.pkl')
-        self.classifier = None
-        self.regressor = None
+        self.model = None
 
-        try:
-            self.model = load(model_path)
-            print(self.task_name, ' evaluator loaded')
-        except:
-            print(self.task_name, ' evaluator not found, training new one...')
-            if 'classification' in task_type:
-                self.classifier = RandomForestClassifier(random_state=0)
-                dump(self.classifier, clf_model_path)
-            if 'regression' in task_type:
-                self.regressor = RandomForestRegressor(random_state=0)
-                dump(self.regressor, reg_model_path)
-            perfermance = self.train()
-            print('Oracle peformance: ', perfermance)
+        if os.path.exists(self.model_path):
+            self.model = load(self.model_path)
+        else:
+            print(f"{task_name} model not found, training...")
+            if task_type == 'classification':
+                self.model = RandomForestClassifier(random_state=0)
+            else:
+                self.model = RandomForestRegressor(random_state=0)
+        dump(self.model, self.model_path)
 
     def train(self):
         data_path = os.path.dirname(self.model_path)
         data_path = os.path.join(os.path.dirname(self.model_path), '..', f'raw/{self.task_name}.csv.gz')
         df = pd.read_csv(data_path)
-        
-        col_name_regression = []
-        col_name_classification = []
-        for t, col in zip(self.registry[self.task_name]['types'], self.registry[self.task_name]['cols']):
-            if t == 'regression':
-                col_name_regression.append(col)
-            elif t == 'classification':
-                col_name_classification.append(col)
 
-        df = df[df[col_name_regression+col_name_classification].notna().all(axis=1)]
-        y_regress = df[col_name_regression].to_numpy()
-        y_classify = df[col_name_classification].to_numpy()
+        y = df[self.task_name].to_numpy()
         x_smiles = df['smiles'].to_numpy()
-        #mask = ~np.isnan(y)
-        #y = y[mask]
+        mask = ~np.isnan(y)
+        y = y[mask]
 
-        y_classify = y_classify.astype(int)
+        if self.task_type == 'classification':
+            y = y.astype(int)
 
-        #x_smiles = x_smiles[mask]
+        x_smiles = x_smiles[mask]
         x_fps = []
         mask = []
         for i,smiles in enumerate(x_smiles):
@@ -80,26 +57,21 @@ class TaskModel():
             x_fps.append(fp)
         x_fps = np.concatenate(x_fps, axis=0)
 
-        regress_perf = 0.0
-        classify_perf = 0.0
-        if self.regressor is not None:
-            self.regressor.fit(x_fps, y_regress)
-            y_pred = self.regressor.predict(x_fps)
-            regress_perf = self.metric_func(y_regress, y_pred)
-            print(f'{self.task_name} regression performance: {regress_perf}')
-            dump(self.classifier, self.model_path.replace('.pkl', '_clf.pkl'))
+        perf = 0.0
+
+        self.model.fit(x_fps, y)
+        if self.task_type == 'regression':
+            y_pred = self.model.predict(x_fps)
+            perf = mean_absolute_error(y, y_pred)
         else:
-            print("There is no regressor for the task")
-        
-        if self.classifier is not None:
-            self.classifier.fit(x_fps, y_classify)
-            y_pred = self.classifier.predict(x_fps)
-            classify_perf = self.metric_func(y_classify, y_pred)
-            print(f'{self.task_name} classification performance: {classify_perf}')
-            dump(self.regressor, self.model_path.replace('.pkl', '_reg.pkl'))
-        else:
-            print("There is no classifier for the task")
-        return classify_perf, regress_perf
+            y_pred_proba = self.model.predict_proba(x_fps)
+            if len(np.unique(y)) > 2:  # multi-class
+                perf = roc_auc_score(y, y_pred_proba, multi_class='ovo', average='macro')
+            else:  # two-class
+                perf = roc_auc_score(y, y_pred_proba[:, 1])
+        print(f'{self.task_name} performance: {perf}')
+        dump(self.model, self.model_path)
+        return perf
 
     def __call__(self, smiles_list):
         fps = []
@@ -113,15 +85,17 @@ class TaskModel():
         fps = np.concatenate(fps, axis=0)
         mask = np.array(mask)
 
-        outputs = {}
+        outputs = 0.0
 
-        if self.classifier is not None:
-            scores_cls = self.classifier.predict_proba(fps)[:, 1]
-            outputs['classification'] = (scores_cls * mask).astype(np.float32)
-
-        if self.regressor is not None:
-            scores_reg = self.regressor.predict(fps)
-            outputs['regression'] = (scores_reg * mask).astype(np.float32)
+        if self.task_type == 'classification':
+            scores_cls = self.model.predict_proba(fps)
+            if scores_cls.shape[1] == 2:
+                outputs = (scores_cls[:, 1] * mask).astype(np.float32)
+            else:
+                outputs = (scores_cls * mask).astype(np.float32)
+        else:
+            scores_reg = self.model.predict(fps)
+            outputs = (scores_reg * mask).astype(np.float32)
 
         return outputs
 

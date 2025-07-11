@@ -47,4 +47,4 @@ dataset:
     metric_model:
         use_metric: True
         model_dir: 'data/evaluator/'
-        use_registry: 'task_registry.yaml' 
+        use_registry: 'task_registry.yaml' #TODO

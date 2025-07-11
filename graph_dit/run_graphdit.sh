@@ -25,15 +25,15 @@ echo "Conda env: $(conda info --envs | grep \* | awk '{print $1}')" | tee -a $LO
 echo "Generate .yaml file for inputs..." | tee -a $LOGFILE
 # Notice properties used in evaluation could be different from properties used in guidance
 python generate_registry.py \
-  --task_dict '{"heat_related_output":["mu","alpha","zpve","Cv"]}' \
-  --task_types '{"heat_related_output":["regression", "regression", "regression", "regression"]}' | tee -a $LOGFILE
+  --task_dict '{"classification_dataset":["Cv", "gap_class"]}' \
+  --task_types '{"classification_dataset":["regression", "classification"]}' | tee -a $LOGFILE
 
 # Run the script
 echo "Starting Python script..." | tee -a $LOGFILE
 python main.py --config-name=config.yaml \
     model.ensure_connected=True \
-    dataset.task_name='heat_related_output' \
-    dataset.guidance_target='mu-alpha-zpve-Cv' | tee -a $LOGFILE
+    dataset.task_name='classification_dataset' \
+    dataset.guidance_target='Cv-gap_class' | tee -a $LOGFILE
 
 echo "------------------------------------------------" | tee -a $LOGFILE
 echo "GraphDiT Job Finished: $(date)" | tee -a $LOGFILE

@@ -2,6 +2,7 @@
 from analysis.rdkit_functions import compute_molecular_metrics
 from mini_moses.metrics.metrics import compute_intermediate_statistics
 from metrics.property_metric import TaskModel
+from generate_registry import load_registry
 
 import torch
 import torch.nn as nn
@@ -61,15 +62,16 @@ class SamplingMolecularMetrics(nn.Module):
             "device": device,
             "batch_size": batch_size,
         }
+        registry = load_registry(os.path.join(dataset_infos.base_path, "configs/task_registry.yaml"))
 
-        self.task_evaluator = {'meta_taskname': dataset_infos.task, 'sas': None, 'scs': None}
-        for cur_task in dataset_infos.task.split("-")[:]:
+        self.task_evaluator = {'meta_taskname': dataset_infos.task}
+        for idx, cur_task in enumerate(registry[self.task_name]['cols']):
             # print('loading evaluator for task', cur_task)
             model_path = os.path.join(
                 dataset_infos.base_path, "data/evaluator", f"{cur_task}.joblib"
             )
             os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            evaluator = TaskModel(model_path, cur_task)
+            evaluator = TaskModel(model_path, cur_task, registry[self.task_name]['types'][idx])
             self.task_evaluator[cur_task] = evaluator
 
     def forward(self, molecules, targets, name, current_epoch, val_counter, test=False):

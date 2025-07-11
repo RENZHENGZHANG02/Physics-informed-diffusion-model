@@ -1,9 +1,13 @@
 import torch
 import torch.nn as nn
+from pathlib import Path
 
 import utils
 from models.layers import Attention, Mlp
 from models.conditions import TimestepEmbedder, CategoricalEmbedder, ClusterContinuousEmbedder
+
+from generate_registry import load_registry
+import os
 
 def modulate(x, shift, scale):
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
@@ -20,6 +24,7 @@ class Denoiser(nn.Module):
         Xdim=118,
         Edim=5,
         ydim=3,
+        task_name=None,
         task_type=None,
     ):
         super().__init__()
@@ -29,13 +34,17 @@ class Denoiser(nn.Module):
 
         self.t_embedder = TimestepEmbedder(hidden_size)
         self.y_embedding_list = torch.nn.ModuleList()
+        base_path = Path(__file__).resolve()
+        project_root = base_path.parents[2]  # /home/xchen5/Graph-DiT
+        self._registry = load_registry(os.path.join(project_root, "configs/task_registry.yaml"))
 
         #self.y_embedding_list.append(ClusterContinuousEmbedder(2, hidden_size, drop_condition))
         for i in range(ydim):
             if task_type[i] == 'regression':
                 self.y_embedding_list.append(ClusterContinuousEmbedder(1, hidden_size, drop_condition))
             else:
-                self.y_embedding_list.append(CategoricalEmbedder(2, hidden_size, drop_condition))
+                num_classes = list(self._registry[task_name]['num_classes'].values())[i]
+                self.y_embedding_list.append(CategoricalEmbedder(num_classes, hidden_size, drop_condition))
 
         self.encoders = nn.ModuleList(
             [

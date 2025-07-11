@@ -70,6 +70,7 @@ class Graph_DiT(pl.LightningModule):
                         Xdim=self.Xdim, 
                         Edim=self.Edim,
                         ydim=self.ydim,
+                        task_name=dataset_infos.task,
                         task_type=dataset_infos.task_type)
         
         self.noise_schedule = PredefinedNoiseScheduleDiscrete(cfg.model.diffusion_noise_schedule,
