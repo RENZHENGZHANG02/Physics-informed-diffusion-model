@@ -14,13 +14,18 @@ def main(task_dict_json, task_types_json, output_path="configs/task_registry.yam
     registry = {}
     for task, cols in task_dict.items():
         registry[task] = {
-            "type": task_types[task], 
+            "types": task_types[task], 
             "cols": cols
         }
 
     with open(output_path, "w") as f:
         yaml.dump(registry, f, sort_keys=False)
     print(f"Generated {output_path} successfully.")
+
+def load_registry(path):
+    with open(path, "r") as f:
+        registry = yaml.safe_load(f)
+    return registry
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate task registry YAML.")

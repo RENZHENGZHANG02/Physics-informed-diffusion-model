@@ -1,6 +1,6 @@
 import sys
 sys.path.append('../') 
-import yaml
+from generate_registry import load_registry
 
 import os
 import os.path as osp
@@ -203,10 +203,10 @@ class Dataset(InMemoryDataset):
 class DataInfos(AbstractDatasetInfos):
     def __init__(self, datamodule, cfg):      
         base_path = pathlib.Path(os.path.realpath(__file__))
-        registry = self._load_registry(os.path.join(base_path.parents[2], "configs/task_registry.yaml"))
+        registry = load_registry(os.path.join(base_path.parents[2], "configs/task_registry.yaml"))
         task_name = cfg.dataset.task_name
         self.task = task_name
-        self.task_type = registry[task_name]["type"]
+        self.task_type = registry[task_name]["types"]
         self.ensure_connected = cfg.model.ensure_connected
 
         datadir = cfg.dataset.datadir
@@ -243,10 +243,6 @@ class DataInfos(AbstractDatasetInfos):
         self.train_ymin = []
         self.train_ymax = []
 
-    def _load_registry(self, path):
-        with open(path, "r") as f:
-            registry = yaml.safe_load(f)
-        return registry
 
 def compute_meta(root, source_name, train_index, test_index):
     pt = Chem.GetPeriodicTable()

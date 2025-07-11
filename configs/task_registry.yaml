@@ -1,5 +1,9 @@
 heat_related_output:
-  type: regression
+  types:
+  - regression
+  - regression
+  - regression
+  - regression
   cols:
   - mu
   - alpha

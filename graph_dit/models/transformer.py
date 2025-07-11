@@ -20,7 +20,7 @@ class Denoiser(nn.Module):
         Xdim=118,
         Edim=5,
         ydim=3,
-        task_type='regression',
+        task_type=None,
     ):
         super().__init__()
         self.num_heads = num_heads
@@ -30,9 +30,9 @@ class Denoiser(nn.Module):
         self.t_embedder = TimestepEmbedder(hidden_size)
         self.y_embedding_list = torch.nn.ModuleList()
 
-        self.y_embedding_list.append(ClusterContinuousEmbedder(2, hidden_size, drop_condition))
-        for i in range(ydim - 2):
-            if task_type == 'regression':
+        #self.y_embedding_list.append(ClusterContinuousEmbedder(2, hidden_size, drop_condition))
+        for i in range(ydim):
+            if task_type[i] == 'regression':
                 self.y_embedding_list.append(ClusterContinuousEmbedder(1, hidden_size, drop_condition))
             else:
                 self.y_embedding_list.append(CategoricalEmbedder(2, hidden_size, drop_condition))
@@ -88,11 +88,13 @@ class Denoiser(nn.Module):
         x = self.x_embedder(x)
 
         c1 = self.t_embedder(t)
-        for i in range(1, self.ydim):
-            if i == 1:
-                c2 = self.y_embedding_list[i-1](y[:, :2], self.training, force_drop_id)
+        c2 = 0
+        for i in range(self.ydim):
+            if isinstance(self.y_embedding_list[i], CategoricalEmbedder):
+                y_input = y[:, i]  # shape (B,)
             else:
-                c2 = c2 + self.y_embedding_list[i-1](y[:, i:i+1], self.training, force_drop_id)
+                y_input = y[:, i:i+1]  # shape (B, 1)
+            c2 = c2 + self.y_embedding_list[i](y_input, self.training, force_drop_id)
         c = c1 + c2
         
         for i, block in enumerate(self.encoders):
