@@ -71,7 +71,7 @@ class SamplingMolecularMetrics(nn.Module):
                 dataset_infos.base_path, "data/evaluator", f"{cur_task}.joblib"
             )
             os.makedirs(os.path.dirname(model_path), exist_ok=True)
-            evaluator = TaskModel(model_path, cur_task, registry[self.task_name]['types'][idx])
+            evaluator = TaskModel(model_path, cur_task, registry[self.task_name]['types'][idx], self.task_name)
             self.task_evaluator[cur_task] = evaluator
 
     def forward(self, molecules, targets, name, current_epoch, val_counter, test=False):

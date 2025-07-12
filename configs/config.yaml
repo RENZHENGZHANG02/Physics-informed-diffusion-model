@@ -10,7 +10,7 @@ general:
     chains_to_save: 1
     log_every_steps: 50
     number_chain_steps: 8
-    final_model_samples_to_generate: 10000
+    final_model_samples_to_generate: 1000
     final_model_samples_to_save: 20
     final_model_chains_to_save: 1
     enable_progress_bar: False
@@ -22,16 +22,16 @@ model:
     diffusion_steps: 500
     diffusion_noise_schedule: 'cosine'
     guide_scale: 2
-    hidden_size: 1152
-    depth: 6
-    num_heads: 16
+    hidden_size: 512
+    depth: 4
+    num_heads: 8
     mlp_ratio: 4
     drop_condition: 0.01
     lambda_train: [1, 10]  # node and edge training weight 
     ensure_connected: True
 train:
-    n_epochs: 10000
-    batch_size: 200
+    n_epochs: 5000
+    batch_size: 300
     lr: 0.0002
     clip_grad: null
     num_workers: 0

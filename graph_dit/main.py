@@ -107,6 +107,7 @@ def main(cfg: DictConfig):
         os.chdir(cfg.general.resume.split("checkpoints")[0])
 
     model = Graph_DiT(cfg=cfg, **model_kwargs)
+
     trainer = Trainer(
         gradient_clip_val=cfg.train.clip_grad,
         accelerator="gpu"

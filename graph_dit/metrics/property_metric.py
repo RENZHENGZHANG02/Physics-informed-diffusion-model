@@ -18,11 +18,12 @@ rdBase.DisableLog('rdApp.error')
 
 class TaskModel():
     """Scores based on an ECFP classifier."""
-    def __init__(self, model_path, task_name, task_type):
+    def __init__(self, model_path, task_name, task_type, main_task):
         self.task_name = task_name
         self.task_type = task_type
         self.model_path = model_path
         self.model = None
+        self.main_task = main_task
 
         if os.path.exists(self.model_path):
             self.model = load(self.model_path)
@@ -32,11 +33,14 @@ class TaskModel():
                 self.model = RandomForestClassifier(random_state=0)
             else:
                 self.model = RandomForestRegressor(random_state=0)
+
+        performance = self.train()
         dump(self.model, self.model_path)
+        print('Oracle peformance: ', performance)
 
     def train(self):
         data_path = os.path.dirname(self.model_path)
-        data_path = os.path.join(os.path.dirname(self.model_path), '..', f'raw/{self.task_name}.csv.gz')
+        data_path = os.path.join(os.path.dirname(self.model_path), '..', f'raw/{self.main_task}.csv.gz')
         df = pd.read_csv(data_path)
 
         y = df[self.task_name].to_numpy()
@@ -70,7 +74,6 @@ class TaskModel():
             else:  # two-class
                 perf = roc_auc_score(y, y_pred_proba[:, 1])
         print(f'{self.task_name} performance: {perf}')
-        dump(self.model, self.model_path)
         return perf
 
     def __call__(self, smiles_list):
@@ -92,7 +95,7 @@ class TaskModel():
             if scores_cls.shape[1] == 2:
                 outputs = (scores_cls[:, 1] * mask).astype(np.float32)
             else:
-                outputs = (scores_cls * mask).astype(np.float32)
+                outputs = (scores_cls.max(axis=1) * mask).astype(np.float32)
         else:
             scores_reg = self.model.predict(fps)
             outputs = (scores_reg * mask).astype(np.float32)
