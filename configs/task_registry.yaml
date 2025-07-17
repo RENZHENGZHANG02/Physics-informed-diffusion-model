@@ -1,10 +1,16 @@
-classification_dataset:
+heat_related_output:
   types:
   - regression
-  - classification
+  - regression
+  - regression
+  - regression
   cols:
+  - mu
+  - alpha
+  - zpve
   - Cv
-  - gap_class
   num_classes:
+    mu: 0
+    alpha: 0
+    zpve: 0
     Cv: 0
-    gap_class: 3

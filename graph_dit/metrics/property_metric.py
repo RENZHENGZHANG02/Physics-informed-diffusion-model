@@ -25,18 +25,16 @@ class TaskModel():
         self.model = None
         self.main_task = main_task
 
-        if os.path.exists(self.model_path):
-            self.model = load(self.model_path)
+        print(f"Training new {task_name} model...")
+        if task_type == 'classification':
+            self.model = RandomForestClassifier(random_state=0)
         else:
-            print(f"{task_name} model not found, training...")
-            if task_type == 'classification':
-                self.model = RandomForestClassifier(random_state=0)
-            else:
-                self.model = RandomForestRegressor(random_state=0)
+            self.model = RandomForestRegressor(random_state=0)
 
-        performance = self.train()
+        self.train()
+
         dump(self.model, self.model_path)
-        print('Oracle peformance: ', performance)
+        #print('Oracle peformance: ', performance)
 
     def train(self):
         data_path = os.path.dirname(self.model_path)
@@ -86,19 +84,16 @@ class TaskModel():
             fps.append(fp)
 
         fps = np.concatenate(fps, axis=0)
-        mask = np.array(mask)
+        mask = np.array(mask).astype(bool)
 
         outputs = 0.0
 
         if self.task_type == 'classification':
             scores_cls = self.model.predict_proba(fps)
-            if scores_cls.shape[1] == 2:
-                outputs = (scores_cls[:, 1] * mask).astype(np.float32)
-            else:
-                outputs = (scores_cls.max(axis=1) * mask).astype(np.float32)
+            outputs = np.argmax(scores_cls[mask], axis=1)
         else:
             scores_reg = self.model.predict(fps)
-            outputs = (scores_reg * mask).astype(np.float32)
+            outputs = (scores_reg[mask]).astype(np.float32)
 
         return outputs
 

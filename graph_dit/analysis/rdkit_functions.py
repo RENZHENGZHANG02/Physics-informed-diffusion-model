@@ -152,18 +152,16 @@ class BasicMolecularMetrics(object):
                         scores = self.task_evaluator[name](valid)
                     targets_log[f'output_{name}'] = np.array([float('nan')] * len(valid_index))
                     targets_log[f'output_{name}'][valid_index] = scores
-                    if name in ['O2', 'N2', 'CO2']:
-                        if len(meta_split) == 2:
-                            cached_perm[name] = scores
-                        scores, cur_targets = np.log10(scores), np.log10(targets[:, i])
-                        dist_metrics[f'{name}/mae'] = np.mean(np.abs(scores - cur_targets))
-                    elif name == 'sas':
+                    if name == 'sas':
                         dist_metrics[f'{name}/mae'] = np.mean(np.abs(scores - targets[:, i]))
                     else:
-                        true_y = targets[:, i]
-                        predicted_labels = (scores >= 0.5).astype(int)
-                        acc = (predicted_labels == true_y).sum() / len(true_y)
-                        dist_metrics[f'{name}/acc'] = acc
+                        if self.task_evaluator[name].task_type == "regression":
+                            dist_metrics[f'{name}/mae'] = np.mean(np.abs(scores - targets[:, i]))
+                        elif self.task_evaluator[name].task_type == "classification":
+                            true_y = targets[:, i]
+                            predicted_labels = (scores >= 0.5).astype(int)
+                            acc = (predicted_labels == true_y).sum() / len(true_y)
+                            dist_metrics[f'{name}/acc'] = acc
 
                 if len(meta_split) == 2:
                     if cached_perm[meta_split[0]] is not None and cached_perm[meta_split[1]] is not None:
