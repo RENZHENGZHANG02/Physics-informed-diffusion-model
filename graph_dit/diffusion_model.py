@@ -3,6 +3,7 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 import time
 import os
+import gc
 
 from models.transformer import Denoiser
 from diffusion.noise_schedule import PredefinedNoiseScheduleDiscrete, MarginalTransition
@@ -225,10 +226,14 @@ class Graph_DiT(pl.LightningModule):
                     num_examples = self.val_y_collection.size(0)
                 batch_y = self.val_y_collection[start_index:start_index + to_generate]                
                 all_ys.append(batch_y)
+                print("[val]torch summary before", torch.cuda.memory_allocated())
+                print("[val] reserved:", torch.cuda.memory_reserved())
                 samples.extend(self.sample_batch(batch_id=ident, batch_size=to_generate, y=batch_y,
                                                 save_final=to_save,
                                                 keep_chain=chains_save,
                                                 number_chain_steps=self.number_chain_steps))
+                print("[val]torch summary after", torch.cuda.memory_allocated())
+                print("[val] reserved:", torch.cuda.memory_reserved())
                 ident += to_generate
                 start_index += to_generate
 
@@ -296,9 +301,13 @@ class Graph_DiT(pl.LightningModule):
             to_save = min(samples_left_to_save, bs)
             chains_save = min(chains_left_to_save, bs)
             batch_y = test_y_collection[batch_id : batch_id + to_generate]
+            print("[test]torch summary before", torch.cuda.memory_allocated())
+            print("[test] reserved:", torch.cuda.memory_reserved())
 
             cur_sample = self.sample_batch(batch_id, to_generate, batch_y, save_final=to_save,
                                             keep_chain=chains_save, number_chain_steps=self.number_chain_steps)
+            print("[test]torch summary after", torch.cuda.memory_allocated())
+            print("[test] reserved:", torch.cuda.memory_reserved())
             samples = samples + cur_sample
             
             all_ys.append(batch_y)
@@ -469,7 +478,6 @@ class Graph_DiT(pl.LightningModule):
            Output: nll (size 1)
        """
         t = noisy_data['t']
-
         # 1.
         N = node_mask.sum(1).long()
         log_pN = self.node_dist.log_prob(N)
@@ -544,6 +552,9 @@ class Graph_DiT(pl.LightningModule):
             atom_types = X[i, :n].cpu()
             edge_types = E[i, :n, :n].cpu()
             molecule_list.append([atom_types, edge_types])
+        
+        gc.collect()
+        torch.cuda.empty_cache()
         
         return molecule_list
 

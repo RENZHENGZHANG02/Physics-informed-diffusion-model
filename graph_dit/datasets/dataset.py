@@ -24,8 +24,6 @@ from diffusion.distributions import DistributionNodes
 
 bonds = {BT.SINGLE: 1, BT.DOUBLE: 2, BT.TRIPLE: 3, BT.AROMATIC: 4}
 
-n_atoms_per_mol_max = 50
-
 class DataModule(AbstractDataModule):
     def __init__(self, cfg):
         self.datadir = cfg.dataset.datadir
@@ -326,8 +324,9 @@ def compute_meta(root, source_name, train_index, test_index):
         tansition_E[:, :, 0] += cur_tot_bond - tansition_E_temp.sum(axis=-1)
         assert (cur_tot_bond > tansition_E_temp.sum(axis=-1)).sum() >= 0, f'i:{i}, sms:{sms}'
     
+    n_atoms_per_mol = np.array(n_atoms_per_mol[:max(n_atom_list)+1])
     n_atoms_per_mol = np.array(n_atoms_per_mol) / np.sum(n_atoms_per_mol)
-    n_atoms_per_mol = n_atoms_per_mol.tolist()[:n_atoms_per_mol_max]
+    n_atoms_per_mol = n_atoms_per_mol.tolist()
 
     atom_count_list = np.array(atom_count_list) / np.sum(atom_count_list)
     print('processed meta info: ------', filename, '------')

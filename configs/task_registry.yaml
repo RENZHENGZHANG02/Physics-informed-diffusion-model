@@ -1,16 +1,13 @@
-heat_related_output:
+TC:
   types:
   - regression
   - regression
   - regression
-  - regression
   cols:
-  - mu
-  - alpha
-  - zpve
-  - Cv
+  - TC
+  - SA
+  - SC
   num_classes:
-    mu: 0
-    alpha: 0
-    zpve: 0
-    Cv: 0
+    TC: 0
+    SA: 0
+    SC: 0
