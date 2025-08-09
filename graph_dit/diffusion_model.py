@@ -133,7 +133,7 @@ class Graph_DiT(pl.LightningModule):
 
         self.train_metrics(masked_pred_X=pred.X, masked_pred_E=pred.E, true_X=X, true_E=E,
                         log=i % self.log_every_steps == 0)
-        self.log(f'loss', loss, batch_size=X.size(0), sync_dist=True)
+        self.log(f'train_loss', loss, batch_size=X.size(0), sync_dist=True)
         return {'loss': loss}
 
 
@@ -182,7 +182,7 @@ class Graph_DiT(pl.LightningModule):
         pred = self.forward(noisy_data)
         nll = self.compute_val_loss(pred, noisy_data, dense_data.X, dense_data.E, data.y, node_mask, test=False)
         self.val_y_collection.append(data.y)
-        self.log(f'valid_nll', nll, batch_size=data.x.size(0), sync_dist=True)
+        self.log(f'valid_loss', nll, batch_size=data.x.size(0), sync_dist=True)
         return {'loss': nll}
 
     def on_validation_epoch_end(self) -> None:
@@ -270,6 +270,7 @@ class Graph_DiT(pl.LightningModule):
         pred = self.forward(noisy_data)
         nll = self.compute_val_loss(pred, noisy_data, dense_data.X, dense_data.E, data.y, node_mask, test=True)
         self.test_y_collection.append(data.y)
+        self.log(f'test_loss', nll, batch_size=data.x.size(0), sync_dist=True)
         return {'loss': nll}
 
     def on_test_epoch_end(self) -> None:
@@ -279,6 +280,7 @@ class Graph_DiT(pl.LightningModule):
 
         print(f"Epoch {self.current_epoch}: Test NLL {metrics[0] :.2f} -- Test Atom type KL {metrics[1] :.2f} -- ",
               f"Test Edge type KL: {metrics[2] :.2f}")
+        self.log(f'test/NLL', metrics[0], sync_dist=True)
 
         ## final epcoh
         samples_left_to_generate = self.cfg.general.final_model_samples_to_generate

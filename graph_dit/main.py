@@ -12,6 +12,7 @@ from datasets import dataset
 from diffusion_model import Graph_DiT
 from metrics.molecular_metrics_train import TrainMolecularMetricsDiscrete
 from metrics.molecular_metrics_sampling import SamplingMolecularMetrics
+from pytorch_lightning.loggers import TensorBoardLogger
 
 from analysis.visualization import MolecularVisualization
 
@@ -108,6 +109,14 @@ def main(cfg: DictConfig):
 
     model = Graph_DiT(cfg=cfg, **model_kwargs)
 
+    base_dir   = os.path.dirname(os.path.realpath(__file__))
+    tb_log_dir = os.path.join(base_dir, "tb_logs")
+    tb_logger  = TensorBoardLogger(
+        save_dir=tb_log_dir,
+        name='loss',
+        version=None,
+    )
+
     trainer = Trainer(
         gradient_clip_val=cfg.train.clip_grad,
         accelerator="gpu"
@@ -124,7 +133,7 @@ def main(cfg: DictConfig):
         enable_progress_bar=cfg.general.enable_progress_bar,
         callbacks=[],
         reload_dataloaders_every_n_epochs=0,
-        logger=[],
+        logger=tb_logger,
     )
 
     if not cfg.general.test_only:

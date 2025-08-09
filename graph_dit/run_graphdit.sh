@@ -11,11 +11,11 @@ echo "Working directory: $(pwd)" | tee -a $LOGFILE
 echo "------------------------------------------------" | tee -a $LOGFILE
 
 # Properly initialize Conda in non-interactive shell
-source /home/xchen5/miniconda3/etc/profile.d/conda.sh
-conda init bash
-conda activate py39
+source /m2_4tdata/rzhang2/miniconda3/etc/profile.d/conda.sh
+# conda init bash
+conda activate graphdit
 
-# Use only GPU #3
+# Use only GPU #2
 export CUDA_VISIBLE_DEVICES=3
 
 echo "Python path: $(which python)" | tee -a $LOGFILE

@@ -3,6 +3,11 @@ import torch
 import torch.nn as nn
 from metrics.abstract_metrics import CrossEntropyMetric
 from torchmetrics import Metric, MeanSquaredError
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+import matplotlib.pyplot as plt
+
+
 
 # from 2:He to 119:*
 valencies_check = [0, 1, 2, 3, 4, 3, 2, 1, 0, 1, 2, 6, 6, 7, 6, 1, 0, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 4, 7, 6, 1, 0, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 4, 7, 6, 5, 6, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 4, 7, 6, 5, 0, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
@@ -88,7 +93,7 @@ class TrainLossDiscrete(nn.Module):
         epoch_edge_loss = self.edge_loss.compute() if self.edge_loss.total_samples > 0 else -1
         epoch_weight_loss = self.weight_loss.compute() if self.weight_loss.total_samples > 0 else -1
 
-        if log:
-            print(f"Epoch {current_epoch} finished: X_CE: {epoch_node_loss :.4f} -- E_CE: {epoch_edge_loss :.4f} "
-                f"Weight: {epoch_weight_loss :.4f} "
-                f"-- Time taken {time.time() - start_epoch_time:.1f}s ")
+        # if log:
+        print(f"Epoch {current_epoch} finished: X_CE: {epoch_node_loss :.4f} -- E_CE: {epoch_edge_loss :.4f} "
+              f"Weight: {epoch_weight_loss :.4f} "
+              f"-- Time taken {time.time() - start_epoch_time:.1f}s ")
