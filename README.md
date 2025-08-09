@@ -73,16 +73,4 @@ python main.py --config-name=config.yaml \
 
 Feel free to test the code on your own dataset!
 
-## Citation
-
-If you find this repository useful, please cite our paper:
-
-```
-@inproceedings{liu2024graphdit,
-  title={Graph Diffusion Transformers for Multi-Conditional Molecular Generation},
-  author={Liu, Gang and Xu, Jiaxin and Luo, Tengfei and Jiang, Meng},
-  booktitle={The Thirty-eighth Annual Conference on Neural Information Processing Systems},
-  year={2024}
-}
-```
 
